@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ABC Braník – Tabulka</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #f4f6f8;
+      color: #1a1a1a;
+      padding: 2rem 1rem;
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+    }
+
+    .subtitle {
+      font-size: 0.85rem;
+      color: #666;
+      margin-bottom: 1.5rem;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      font-size: 0.9rem;
+    }
+
+    thead {
+      background: #1a3a5c;
+      color: #fff;
+    }
+
+    th, td {
+      padding: 0.65rem 0.9rem;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    th:nth-child(2), td:nth-child(2) {
+      text-align: left;
+    }
+
+    tbody tr:nth-child(even) { background: #f9fafb; }
+    tbody tr:hover { background: #eef3f9; }
+
+    .highlight td {
+      font-weight: 700;
+      background: #e8f0fe !important;
+    }
+
+    .pos { color: #888; font-size: 0.8rem; }
+    .pts { font-weight: 700; color: #1a3a5c; }
+  </style>
+</head>
+<body>
+
+  <h1>H3E 2017 (2HP) – J. Novotného II</h1>
+  <p class="subtitle">Hl. město Praha · ABC Braník fotbal, z. s.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Tým</th>
+          <th>Z</th>
+          <th>Góly</th>
+          <th>Body</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr {% if 'Braník' in r.team or 'Branik' in r.team %}class="highlight"{% endif %}>
+          <td class="pos">{{ r.pos }}</td>
+          <td>{{ r.team }}</td>
+          <td>{{ r.played }}</td>
+          <td>{{ r.gf }}:{{ r.ga }}</td>
+          <td class="pts">{{ r.points }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+</body>
+</html>
