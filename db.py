@@ -39,5 +39,5 @@ def upsert_match(date: str, home: str, away: str, home_goals: int, away_goals: i
 def all_matches() -> list[sqlite3.Row]:
     with get_conn() as conn:
         return conn.execute(
-            "SELECT * FROM matches ORDER BY date"
+            "SELECT * FROM matches ORDER BY id"
         ).fetchall()
