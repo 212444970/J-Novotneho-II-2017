@@ -2,13 +2,13 @@ from collections import defaultdict
 from db import all_matches
 
 
-def build_standings() -> list[dict]:
+def build_standings(tournament: str) -> list[dict]:
     teams: dict[str, dict] = defaultdict(lambda: {
         "team": "", "played": 0, "won": 0, "drawn": 0, "lost": 0,
         "gf": 0, "ga": 0, "history": [],
     })
 
-    for m in all_matches():
+    for m in all_matches(tournament):
         h, a, hg, ag = m["home"], m["away"], m["home_goals"], m["away_goals"]
         for team in (h, a):
             teams[team]["team"] = team
@@ -54,8 +54,8 @@ def build_standings() -> list[dict]:
     return rows
 
 
-def print_standings() -> None:
-    rows = build_standings()
+def print_standings(tournament: str = "liga1") -> None:
+    rows = build_standings(tournament)
     if not rows:
         print("Žádné výsledky v databázi.")
         return
