@@ -21,28 +21,30 @@ def build_standings() -> list[dict]:
         teams[a]["gf"] += ag
         teams[a]["ga"] += hg
 
+        date = m["date"].replace("Datum:", "").strip()
+
         if hg > ag:
             teams[h]["won"] += 1
-            teams[h]["history"].append("W")
+            teams[h]["history"].append({"r": "W", "date": date, "opponent": a, "score": f"{hg}:{ag}"})
             teams[a]["lost"] += 1
-            teams[a]["history"].append("L")
+            teams[a]["history"].append({"r": "L", "date": date, "opponent": h, "score": f"{hg}:{ag}"})
         elif hg < ag:
             teams[a]["won"] += 1
-            teams[a]["history"].append("W")
+            teams[a]["history"].append({"r": "W", "date": date, "opponent": h, "score": f"{ag}:{hg}"})
             teams[h]["lost"] += 1
-            teams[h]["history"].append("L")
+            teams[h]["history"].append({"r": "L", "date": date, "opponent": a, "score": f"{ag}:{hg}"})
         else:
             teams[h]["drawn"] += 1
-            teams[h]["history"].append("D")
+            teams[h]["history"].append({"r": "D", "date": date, "opponent": a, "score": f"{hg}:{ag}"})
             teams[a]["drawn"] += 1
-            teams[a]["history"].append("D")
+            teams[a]["history"].append({"r": "D", "date": date, "opponent": h, "score": f"{hg}:{ag}"})
 
     rows = []
     for t in teams.values():
         t["points"] = t["won"] * 3 + t["drawn"]
         t["gd"] = t["gf"] - t["ga"]
         # last 5, most recent first
-        t["form"] = list(reversed(t["history"][-5:]))
+        t["form"] = list(reversed(t["history"][-5:]))  # most recent first
         del t["history"]
         rows.append(t)
 

@@ -67,6 +67,7 @@
     .pts { font-weight: 700; color: #1a3a5c; }
 
     .form { white-space: nowrap; }
+    .badge-wrap { position: relative; display: inline-block; margin: 0 1px; }
     .badge {
       display: inline-block;
       width: 1.5rem;
@@ -75,11 +76,39 @@
       font-size: 0.75rem;
       font-weight: 700;
       color: #fff;
-      margin: 0 1px;
+      cursor: default;
+      text-align: center;
     }
     .badge-W { background: #2e7d32; }
     .badge-L { background: #c62828; }
     .badge-D { background: #f9a825; color: #333; }
+
+    .tooltip {
+      display: none;
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1a1a1a;
+      color: #fff;
+      font-size: 0.78rem;
+      padding: 6px 10px;
+      border-radius: 6px;
+      white-space: nowrap;
+      z-index: 10;
+      line-height: 1.5;
+      pointer-events: none;
+    }
+    .tooltip::after {
+      content: "";
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 5px solid transparent;
+      border-top-color: #1a1a1a;
+    }
+    .badge-wrap:hover .tooltip { display: block; }
   </style>
 </head>
 <body>
@@ -114,8 +143,15 @@
           <td>{{ r.gf }}:{{ r.ga }}</td>
           <td class="pts">{{ r.points }}</td>
           <td class="form">
-            {% for result in r.form %}
-              <span class="badge badge-{{ result }}">{{ result }}</span>
+            {% for m in r.form %}
+              <span class="badge-wrap">
+                <span class="badge badge-{{ m.r }}">{{ m.r }}</span>
+                <div class="tooltip">
+                  {{ m.date }}<br>
+                  vs {{ m.opponent }}<br>
+                  {{ m.score }}
+                </div>
+              </span>
             {% endfor %}
           </td>
         </tr>
