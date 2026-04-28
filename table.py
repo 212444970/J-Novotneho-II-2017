@@ -5,7 +5,7 @@ from db import all_matches
 def build_standings() -> list[dict]:
     teams: dict[str, dict] = defaultdict(lambda: {
         "team": "", "played": 0, "won": 0, "drawn": 0, "lost": 0,
-        "gf": 0, "ga": 0,
+        "gf": 0, "ga": 0, "history": [],
     })
 
     for m in all_matches():
@@ -23,18 +23,27 @@ def build_standings() -> list[dict]:
 
         if hg > ag:
             teams[h]["won"] += 1
+            teams[h]["history"].append("W")
             teams[a]["lost"] += 1
+            teams[a]["history"].append("L")
         elif hg < ag:
             teams[a]["won"] += 1
+            teams[a]["history"].append("W")
             teams[h]["lost"] += 1
+            teams[h]["history"].append("L")
         else:
             teams[h]["drawn"] += 1
+            teams[h]["history"].append("D")
             teams[a]["drawn"] += 1
+            teams[a]["history"].append("D")
 
     rows = []
     for t in teams.values():
         t["points"] = t["won"] * 3 + t["drawn"]
         t["gd"] = t["gf"] - t["ga"]
+        # last 5, most recent first
+        t["form"] = list(reversed(t["history"][-5:]))
+        del t["history"]
         rows.append(t)
 
     rows.sort(key=lambda r: (-r["points"], -r["gd"], -r["gf"]))

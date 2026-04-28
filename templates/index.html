@@ -65,6 +65,21 @@
 
     .pos { color: #888; font-size: 0.8rem; }
     .pts { font-weight: 700; color: #1a3a5c; }
+
+    .form { white-space: nowrap; }
+    .badge {
+      display: inline-block;
+      width: 1.5rem;
+      line-height: 1.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #fff;
+      margin: 0 1px;
+    }
+    .badge-W { background: #2e7d32; }
+    .badge-L { background: #c62828; }
+    .badge-D { background: #f9a825; color: #333; }
   </style>
 </head>
 <body>
@@ -84,6 +99,7 @@
           <th>P</th>
           <th>Góly</th>
           <th>Body</th>
+          <th>Aktuální forma</th>
         </tr>
       </thead>
       <tbody>
@@ -97,6 +113,11 @@
           <td>{{ r.lost }}</td>
           <td>{{ r.gf }}:{{ r.ga }}</td>
           <td class="pts">{{ r.points }}</td>
+          <td class="form">
+            {% for result in r.form %}
+              <span class="badge badge-{{ result }}">{{ result }}</span>
+            {% endfor %}
+          </td>
         </tr>
         {% endfor %}
       </tbody>
