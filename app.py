@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 from flask import Flask, render_template
-from db import init_db, DB_PATH
+from db import init_db, DB_PATH, get_next_round
 from table import build_standings
 
 app = Flask(__name__)
@@ -15,7 +15,9 @@ def index():
     rows = build_standings()
     mtime = os.path.getmtime(DB_PATH)
     updated = datetime.fromtimestamp(mtime).strftime("%-d. %-m. %Y %H:%M")
-    return render_template("index.html", rows=rows, source_url=SOURCE_URL, updated=updated)
+    next_round = get_next_round()
+    return render_template("index.html", rows=rows, source_url=SOURCE_URL,
+                           updated=updated, next_round=next_round)
 
 
 if __name__ == "__main__":

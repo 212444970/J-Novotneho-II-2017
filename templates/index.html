@@ -160,6 +160,32 @@
     </table>
   </div>
 
+  {% if next_round %}
+  <h2 style="font-size:1rem; font-weight:700; margin-top:2rem; margin-bottom:0.75rem;">
+    Příští kolo — {{ next_round.round }}
+  </h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="text-align:left">Datum</th>
+          <th style="text-align:left">Domácí</th>
+          <th style="text-align:left">Hosté</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in next_round.matches %}
+        <tr {% if 'Braník' in m.home or 'Braník' in m.away %}class="highlight"{% endif %}>
+          <td style="text-align:left">{{ m.date }}</td>
+          <td style="text-align:left">{{ m.home }}</td>
+          <td style="text-align:left">{{ m.away }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
   <p style="margin-top:1.5rem; font-size:0.8rem; color:#888;">
     Zdroj: <a href="{{ source_url }}" target="_blank" style="color:#1a3a5c;">fotbal.cz</a>
     &nbsp;·&nbsp; Poslední aktualizace: {{ updated }}
