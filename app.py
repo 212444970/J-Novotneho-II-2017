@@ -22,13 +22,14 @@ LEAGUES_META = {
 def index():
     init_db()
     mtime = os.path.getmtime(DB_PATH)
-    updated = datetime.fromtimestamp(mtime).strftime("%-d. %-m. %Y %H:%M")
+    dt = datetime.fromtimestamp(mtime)
+    updated = f"{dt.day}. {dt.month}. {dt.year} {dt.strftime('%H:%M')}"
     leagues = []
     for lid, meta in LEAGUES_META.items():
         leagues.append({
             "id": lid,
             "name": meta["name"],
-            "rows": build_standings(lid),
+            "standings": {v: build_standings(lid, v) for v in ("all", "home", "away")},
             "next_round": get_next_round(lid),
             "source_url": meta["source"],
         })

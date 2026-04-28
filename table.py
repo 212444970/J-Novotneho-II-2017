@@ -2,7 +2,8 @@ from collections import defaultdict
 from db import all_matches
 
 
-def build_standings(tournament: str) -> list[dict]:
+def build_standings(tournament: str, venue: str = "all") -> list[dict]:
+    """venue: 'all' | 'home' | 'away'"""
     teams: dict[str, dict] = defaultdict(lambda: {
         "team": "", "played": 0, "won": 0, "drawn": 0, "lost": 0,
         "gf": 0, "ga": 0, "history": [],
@@ -13,31 +14,35 @@ def build_standings(tournament: str) -> list[dict]:
         for team in (h, a):
             teams[team]["team"] = team
 
-        teams[h]["played"] += 1
-        teams[h]["gf"] += hg
-        teams[h]["ga"] += ag
-
-        teams[a]["played"] += 1
-        teams[a]["gf"] += ag
-        teams[a]["ga"] += hg
-
         date = m["date"].replace("Datum:", "").strip()
 
-        if hg > ag:
-            teams[h]["won"] += 1
-            teams[h]["history"].append({"r": "W", "date": date, "opponent": a, "score": f"{hg}:{ag}"})
-            teams[a]["lost"] += 1
-            teams[a]["history"].append({"r": "L", "date": date, "opponent": h, "score": f"{hg}:{ag}"})
-        elif hg < ag:
-            teams[a]["won"] += 1
-            teams[a]["history"].append({"r": "W", "date": date, "opponent": h, "score": f"{ag}:{hg}"})
-            teams[h]["lost"] += 1
-            teams[h]["history"].append({"r": "L", "date": date, "opponent": a, "score": f"{ag}:{hg}"})
-        else:
-            teams[h]["drawn"] += 1
-            teams[h]["history"].append({"r": "D", "date": date, "opponent": a, "score": f"{hg}:{ag}"})
-            teams[a]["drawn"] += 1
-            teams[a]["history"].append({"r": "D", "date": date, "opponent": h, "score": f"{hg}:{ag}"})
+        if venue != "away":  # home team stats
+            teams[h]["played"] += 1
+            teams[h]["gf"] += hg
+            teams[h]["ga"] += ag
+            if hg > ag:
+                teams[h]["won"] += 1
+                teams[h]["history"].append({"r": "W", "date": date, "opponent": a, "score": f"{hg}:{ag}"})
+            elif hg < ag:
+                teams[h]["lost"] += 1
+                teams[h]["history"].append({"r": "L", "date": date, "opponent": a, "score": f"{hg}:{ag}"})
+            else:
+                teams[h]["drawn"] += 1
+                teams[h]["history"].append({"r": "D", "date": date, "opponent": a, "score": f"{hg}:{ag}"})
+
+        if venue != "home":  # away team stats
+            teams[a]["played"] += 1
+            teams[a]["gf"] += ag
+            teams[a]["ga"] += hg
+            if hg < ag:
+                teams[a]["won"] += 1
+                teams[a]["history"].append({"r": "W", "date": date, "opponent": h, "score": f"{ag}:{hg}"})
+            elif hg > ag:
+                teams[a]["lost"] += 1
+                teams[a]["history"].append({"r": "L", "date": date, "opponent": h, "score": f"{ag}:{hg}"})
+            else:
+                teams[a]["drawn"] += 1
+                teams[a]["history"].append({"r": "D", "date": date, "opponent": h, "score": f"{ag}:{hg}"})
 
     rows = []
     for t in teams.values():

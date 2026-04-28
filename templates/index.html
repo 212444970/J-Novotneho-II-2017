@@ -87,6 +87,19 @@
     }
     .badge-wrap:hover .tooltip { display: block; }
 
+    .filter-tabs { display: flex; gap: 4px; margin-bottom: 0.6rem; }
+    .tab {
+      padding: 5px 14px;
+      border: 1px solid #c8d6e8;
+      border-radius: 5px;
+      background: #fff;
+      font-size: 0.82rem;
+      cursor: pointer;
+      color: #444;
+    }
+    .tab:hover { background: #eef3f9; }
+    .tab.active { background: #1a3a5c; color: #fff; border-color: #1a3a5c; }
+
     .next-round {
       margin-top: 1rem;
       font-size: 0.82rem;
@@ -121,6 +134,39 @@
 </head>
 <body>
 
+{% macro standings_table(rows) %}
+<table>
+  <thead>
+    <tr>
+      <th>#</th><th>Tým</th><th>Z</th><th>V</th><th>R</th><th>P</th>
+      <th>Góly</th><th>Body</th><th>Aktuální forma</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in rows %}
+    <tr {% if 'Braník' in r.team or 'Branik' in r.team %}class="highlight"{% endif %}>
+      <td class="pos">{{ r.pos }}</td>
+      <td>{{ r.team }}</td>
+      <td>{{ r.played }}</td>
+      <td>{{ r.won }}</td>
+      <td>{{ r.drawn }}</td>
+      <td>{{ r.lost }}</td>
+      <td>{{ r.gf }}:{{ r.ga }}</td>
+      <td class="pts">{{ r.points }}</td>
+      <td class="form">
+        {% for m in r.form %}
+          <span class="badge-wrap">
+            <span class="badge badge-{{ m.r }}">{{ m.r }}</span>
+            <div class="tooltip">{{ m.date }}<br>vs {{ m.opponent }}<br>{{ m.score }}</div>
+          </span>
+        {% endfor %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endmacro %}
+
 {% for league in leagues %}
 <div class="league">
   <h1>{{ league.name }}</h1>
@@ -128,44 +174,22 @@
     <a href="{{ league.source_url }}" target="_blank" style="color:#666;">fotbal.cz ↗</a>
   </p>
 
+  <div class="filter-tabs" data-league="{{ league.id }}">
+    <button class="tab active" data-venue="all">Celkově</button>
+    <button class="tab" data-venue="home">Doma</button>
+    <button class="tab" data-venue="away">Venku</button>
+  </div>
+
   <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Tým</th>
-          <th>Z</th>
-          <th>V</th>
-          <th>R</th>
-          <th>P</th>
-          <th>Góly</th>
-          <th>Body</th>
-          <th>Aktuální forma</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for r in league.rows %}
-        <tr {% if 'Braník' in r.team or 'Branik' in r.team %}class="highlight"{% endif %}>
-          <td class="pos">{{ r.pos }}</td>
-          <td>{{ r.team }}</td>
-          <td>{{ r.played }}</td>
-          <td>{{ r.won }}</td>
-          <td>{{ r.drawn }}</td>
-          <td>{{ r.lost }}</td>
-          <td>{{ r.gf }}:{{ r.ga }}</td>
-          <td class="pts">{{ r.points }}</td>
-          <td class="form">
-            {% for m in r.form %}
-              <span class="badge-wrap">
-                <span class="badge badge-{{ m.r }}">{{ m.r }}</span>
-                <div class="tooltip">{{ m.date }}<br>vs {{ m.opponent }}<br>{{ m.score }}</div>
-              </span>
-            {% endfor %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    <div class="venue-table" data-league="{{ league.id }}" data-venue="all">
+      {{ standings_table(league.standings.all) }}
+    </div>
+    <div class="venue-table" data-league="{{ league.id }}" data-venue="home" style="display:none">
+      {{ standings_table(league.standings.home) }}
+    </div>
+    <div class="venue-table" data-league="{{ league.id }}" data-venue="away" style="display:none">
+      {{ standings_table(league.standings.away) }}
+    </div>
   </div>
 
   {% if league.next_round %}
@@ -183,6 +207,20 @@
 {% endfor %}
 
 <p class="footer">Poslední aktualizace: {{ updated }}</p>
+
+<script>
+  document.querySelectorAll('.filter-tabs .tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const league = btn.closest('.filter-tabs').dataset.league;
+      const venue = btn.dataset.venue;
+      document.querySelectorAll(`.venue-table[data-league="${league}"]`).forEach(t => {
+        t.style.display = t.dataset.venue === venue ? '' : 'none';
+      });
+      btn.closest('.filter-tabs').querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+</script>
 
 </body>
 </html>
