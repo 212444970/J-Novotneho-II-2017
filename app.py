@@ -6,9 +6,15 @@ from table import build_standings
 
 app = Flask(__name__)
 
-SOURCES = {
-    "liga1": "https://www.fotbal.cz/souteze/turnaje/hlavni/27aa1eb4-07e1-4f73-a513-b470cc36b878",
-    "liga2": "https://www.fotbal.cz/souteze/turnaje/hlavni/b6493972-274a-44a9-ab8e-384fe33580ab",
+LEAGUES_META = {
+    "liga1": {
+        "name": "J. Novotného II",
+        "source": "https://www.fotbal.cz/souteze/turnaje/hlavni/27aa1eb4-07e1-4f73-a513-b470cc36b878",
+    },
+    "liga2": {
+        "name": "2025 H3O – H3O 2017/18",
+        "source": "https://www.fotbal.cz/souteze/turnaje/hlavni/b6493972-274a-44a9-ab8e-384fe33580ab",
+    },
 }
 
 
@@ -18,12 +24,13 @@ def index():
     mtime = os.path.getmtime(DB_PATH)
     updated = datetime.fromtimestamp(mtime).strftime("%-d. %-m. %Y %H:%M")
     leagues = []
-    for lid, source_url in SOURCES.items():
+    for lid, meta in LEAGUES_META.items():
         leagues.append({
             "id": lid,
+            "name": meta["name"],
             "rows": build_standings(lid),
             "next_round": get_next_round(lid),
-            "source_url": source_url,
+            "source_url": meta["source"],
         })
     return render_template("index.html", leagues=leagues, updated=updated)
 

@@ -123,7 +123,7 @@
 
 {% for league in leagues %}
 <div class="league">
-  <h1>{{ league.rows[0].team if league.rows else league.id }}</h1>
+  <h1>{{ league.name }}</h1>
   <p class="subtitle">
     <a href="{{ league.source_url }}" target="_blank" style="color:#666;">fotbal.cz ↗</a>
   </p>
