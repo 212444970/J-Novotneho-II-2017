@@ -1,7 +1,6 @@
 import os
-from datetime import datetime
 from flask import Flask, render_template, redirect, url_for, flash
-from db import init_db, DB_PATH, get_next_round
+from db import init_db, get_next_round, get_last_updated
 from table import build_standings
 
 app = Flask(__name__)
@@ -22,9 +21,7 @@ LEAGUES_META = {
 @app.route("/")
 def index():
     init_db()
-    mtime = os.path.getmtime(DB_PATH)
-    dt = datetime.fromtimestamp(mtime)
-    updated = f"{dt.day}. {dt.month}. {dt.year} {dt.strftime('%H:%M')}"
+    updated = get_last_updated()
     leagues = []
     for lid, meta in LEAGUES_META.items():
         leagues.append({

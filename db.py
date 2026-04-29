@@ -13,6 +13,12 @@ def get_conn() -> sqlite3.Connection:
 def init_db() -> None:
     with get_conn() as conn:
         conn.execute("""
+            CREATE TABLE IF NOT EXISTS meta (
+                key   TEXT PRIMARY KEY,
+                value TEXT
+            )
+        """)
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS matches (
                 id         INTEGER PRIMARY KEY AUTOINCREMENT,
                 tournament TEXT NOT NULL DEFAULT 'liga1',
@@ -75,6 +81,19 @@ def get_next_round(tournament: str) -> dict | None:
             "round": rows[0]["round"],
             "matches": [{"date": r["date"], "home": r["home"], "away": r["away"]} for r in rows],
         }
+
+
+def set_last_updated() -> None:
+    from datetime import datetime, timezone
+    ts = datetime.now(timezone.utc).strftime("%d. %m. %Y %H:%M UTC")
+    with get_conn() as conn:
+        conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('last_updated', ?)", (ts,))
+
+
+def get_last_updated() -> str:
+    with get_conn() as conn:
+        row = conn.execute("SELECT value FROM meta WHERE key='last_updated'").fetchone()
+        return row["value"] if row else "–"
 
 
 def all_matches(tournament: str) -> list[sqlite3.Row]:

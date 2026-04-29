@@ -1,5 +1,5 @@
 import sys
-from db import init_db, upsert_match, save_next_round
+from db import init_db, upsert_match, save_next_round, set_last_updated
 from scraper import fetch_all
 from table import print_standings
 
@@ -30,6 +30,7 @@ def scrape_and_store() -> None:
         if next_round:
             save_next_round(league_id, next_round["round"], next_round["matches"])
             print(f"[{league_id}] Příští kolo: {next_round['round']} ({len(next_round['matches'])} zápasů)")
+    set_last_updated()
 
 
 def main() -> None:
