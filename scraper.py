@@ -1,9 +1,6 @@
 import os
-import time
-import undetected_chromedriver as uc
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+import re
+import requests
 from bs4 import BeautifulSoup
 
 LEAGUES = {
@@ -11,64 +8,30 @@ LEAGUES = {
     "liga2": "https://www.fotbal.cz/souteze/turnaje/zapas/b6493972-274a-44a9-ab8e-384fe33580ab",
 }
 
-_USER_AGENT = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
-)
-
-# Reads from env var CF_CLEARANCE (Railway) or falls back to hardcoded value (local)
-_CF_CLEARANCE_FALLBACK = (
-    "Xxfkw4NesscagWZzV8wg61Fg8a85LQg4wmEXo.73RJw-1777234006-1.2.1.1-"
-    "8kIeeHRDVViTRZylYd2UvsUL9IIAgxHICPrfcMc.w.tGZCFDJl.7kBe9M_QEAcl"
-    "FsZf.PWnt_D1pQcr8FwCKIgjwLLYdMydMWQYkE8OoTgy3FuFP.r_wzKmphPjvaEf"
-    "JGks2V1qh5Zdko84Ln6mxvbN6VjAnQCn6MwUGBBxT5Qoc16LEV0biiIO7_qsh17a"
-    "UcEcw_ll.pgK.VdPYLxuygpGjJ19uEC6GKsWbgR7WAdF_Qu6z4jDUAUcYgvn.a6t"
-    "9Z9..jeh0XubsnAv23.sDUa7NWDaStDPwjJM8L75fPFAxfL3OuCdg.szr9rQamOF9"
-    "3cfCY.UVvmpAeWsb0INYDrRblhSgriEJLkdip0rRLeiC0_Ew_VmUGjq_lSFt3YzBE"
-    "lTgpXuO7HCJDEua41JgE3aGkXoTw7HvlrEniV_ohq4"
-)
-
-_ON_RAILWAY = bool(os.environ.get("RAILWAY_ENVIRONMENT"))
+# Set FLARESOLVERR_URL as Railway env var, e.g. http://flaresolverr:8191
+FLARESOLVERR_URL = os.environ.get("FLARESOLVERR_URL", "http://localhost:8191")
 
 
-def _get_cf_clearance() -> str:
-    return os.environ.get("CF_CLEARANCE", _CF_CLEARANCE_FALLBACK)
-
-
-def _make_driver() -> uc.Chrome:
-    options = uc.ChromeOptions()
-    options.add_argument(f"--user-agent={_USER_AGENT}")
-    options.add_argument("--window-size=1920,1080")
-    if _ON_RAILWAY:
-        options.add_argument("--headless=new")
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.binary_location = "/usr/bin/google-chrome"
-        return uc.Chrome(options=options, use_subprocess=False)
-    return uc.Chrome(options=options, use_subprocess=True, version_main=147)
+def _fetch_html(url: str) -> str:
+    resp = requests.post(
+        f"{FLARESOLVERR_URL}/v1",
+        json={"cmd": "request.get", "url": url, "maxTimeout": 60000},
+        timeout=90,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    if data.get("status") != "ok":
+        raise RuntimeError(f"FlareSolverr error: {data.get('message')}")
+    return data["solution"]["response"]
 
 
 def fetch_all() -> dict[str, tuple[list[dict], dict | None, str]]:
-    """Returns {league_id: (played_matches, next_round, page_title)}"""
-    driver = _make_driver()
     results = {}
-    try:
-        driver.get("https://www.fotbal.cz")
-        WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
-        driver.add_cookie({"name": "cf_clearance", "value": _get_cf_clearance(),
-                           "domain": ".fotbal.cz", "path": "/", "secure": True})
-
-        for league_id, url in LEAGUES.items():
-            driver.get(url)
-            WebDriverWait(driver, 20).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "a.MatchRound-match"))
-            )
-            time.sleep(2)
-            soup = BeautifulSoup(driver.page_source, "html.parser")
-            title = soup.title.get_text(strip=True).split("|")[0].strip() if soup.title else league_id
-            results[league_id] = (_parse_played(soup), _parse_next_round(soup), title)
-    finally:
-        driver.quit()
+    for league_id, url in LEAGUES.items():
+        html = _fetch_html(url)
+        soup = BeautifulSoup(html, "html.parser")
+        title = soup.title.get_text(strip=True).split("|")[0].strip() if soup.title else league_id
+        results[league_id] = (_parse_played(soup), _parse_next_round(soup), title)
     return results
 
 
@@ -87,9 +50,6 @@ def _parse_played(soup: BeautifulSoup) -> list[dict]:
 
 
 def _parse_next_round(soup: BeautifulSoup) -> dict | None:
-    import re
-
-    # collect all sections with their round number and matches
     sections = []
     for section in soup.select("section.js-matchRoundSection"):
         label = section.get_text(" ", strip=True).split("Zobrazit")[0].strip()
@@ -100,7 +60,6 @@ def _parse_next_round(soup: BeautifulSoup) -> dict | None:
         upcoming = [a for a in all_matches if not a.find("strong", class_="H4")]
         sections.append({"label": label, "num": round_num, "played": played, "upcoming": upcoming})
 
-    # find highest round number that has at least one played match
     max_played_round = max(
         (s["num"] for s in sections if s["played"] and s["num"] is not None),
         default=None,
@@ -108,9 +67,7 @@ def _parse_next_round(soup: BeautifulSoup) -> dict | None:
     if max_played_round is None:
         return None
 
-    # find the section with round number = max_played_round + 1
-    next_num = max_played_round + 1
-    next_section = next((s for s in sections if s["num"] == next_num), None)
+    next_section = next((s for s in sections if s["num"] == max_played_round + 1), None)
     if not next_section:
         return None
 
@@ -121,9 +78,7 @@ def _parse_next_round(soup: BeautifulSoup) -> dict | None:
             continue
         matches.append({"date": _get_date(a), "home": teams[0], "away": teams[1]})
 
-    if not matches:
-        return None
-    return {"round": next_section["label"], "matches": matches}
+    return {"round": next_section["label"], "matches": matches} if matches else None
 
 
 def _get_date(a) -> str:
