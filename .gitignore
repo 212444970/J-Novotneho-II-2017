@@ -1,5 +1,3 @@
 __pycache__/
 *.pyc
 debug_page.html
-scraper.py
-main.py
