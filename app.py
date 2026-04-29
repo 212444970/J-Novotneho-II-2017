@@ -1,10 +1,11 @@
 import os
 from datetime import datetime
-from flask import Flask, render_template
+from flask import Flask, render_template, redirect, url_for, flash
 from db import init_db, DB_PATH, get_next_round
 from table import build_standings
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", "branik-dev")
 
 LEAGUES_META = {
     "liga1": {
@@ -33,8 +34,25 @@ def index():
             "next_round": get_next_round(lid),
             "source_url": meta["source"],
         })
-    return render_template("index.html", leagues=leagues, updated=updated)
+    messages = flash_messages()
+    return render_template("index.html", leagues=leagues, updated=updated, messages=messages)
+
+
+@app.route("/refresh", methods=["POST"])
+def refresh():
+    try:
+        from main import scrape_and_store
+        scrape_and_store()
+        flash("ok")
+    except Exception as e:
+        flash(f"err:{e}")
+    return redirect(url_for("index"))
+
+
+def flash_messages():
+    from flask import get_flashed_messages
+    return get_flashed_messages()
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=True)

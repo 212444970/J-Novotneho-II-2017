@@ -128,8 +128,25 @@
       margin-top: 2rem;
       font-size: 0.8rem;
       color: #888;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
     }
     .footer a { color: #1a3a5c; }
+    .refresh-btn {
+      padding: 5px 14px;
+      background: #1a3a5c;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      font-size: 0.82rem;
+      cursor: pointer;
+    }
+    .refresh-btn:hover { background: #254e7a; }
+    .refresh-btn:disabled { background: #888; cursor: default; }
+    .msg-ok  { color: #2e7d32; font-weight: 600; }
+    .msg-err { color: #c62828; }
   </style>
 </head>
 <body>
@@ -206,9 +223,27 @@
 </div>
 {% endfor %}
 
-<p class="footer">Poslední aktualizace: {{ updated }}</p>
+<div class="footer">
+  <span>Poslední aktualizace: {{ updated }}</span>
+  <form method="post" action="/refresh" id="refresh-form">
+    <button class="refresh-btn" id="refresh-btn" type="submit">Aktualizovat výsledky</button>
+  </form>
+  {% for msg in messages %}
+    {% if msg == 'ok' %}
+      <span class="msg-ok">Aktualizováno</span>
+    {% elif msg.startswith('err:') %}
+      <span class="msg-err">Chyba: {{ msg[4:] }}</span>
+    {% endif %}
+  {% endfor %}
+</div>
 
 <script>
+  document.getElementById('refresh-form').addEventListener('submit', () => {
+    const btn = document.getElementById('refresh-btn');
+    btn.disabled = true;
+    btn.textContent = 'Načítám…';
+  });
+
   document.querySelectorAll('.filter-tabs .tab').forEach(btn => {
     btn.addEventListener('click', () => {
       const league = btn.closest('.filter-tabs').dataset.league;
