@@ -1,11 +1,7 @@
 import os
 import re
-import time
 import requests
-import undetected_chromedriver as uc
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+from playwright.sync_api import sync_playwright
 from bs4 import BeautifulSoup
 
 LEAGUES = {
@@ -14,16 +10,14 @@ LEAGUES = {
 }
 
 FLARESOLVERR_URL = os.environ.get("FLARESOLVERR_URL", "http://localhost:8191")
-_ON_RAILWAY = bool(os.environ.get("RAILWAY_ENVIRONMENT"))
 
 _USER_AGENT = (
     "Mozilla/5.0 (X11; Linux x86_64) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 )
 
 
 def _get_cf_clearance() -> str:
-    """Use FlareSolverr to get a valid cf_clearance cookie."""
     resp = requests.post(
         f"{FLARESOLVERR_URL}/v1",
         json={"cmd": "request.get", "url": "https://www.fotbal.cz", "maxTimeout": 60000},
@@ -40,58 +34,42 @@ def _get_cf_clearance() -> str:
     return cf
 
 
-def _make_driver(cf_clearance: str):
-    if _ON_RAILWAY:
-        from selenium import webdriver
-        from selenium.webdriver.chrome.service import Service
-        opts = webdriver.ChromeOptions()
-        opts.binary_location = "/usr/bin/chromium"
-        for arg in (
-            f"--user-agent={_USER_AGENT}",
-            "--window-size=1920,1080",
-            "--headless=new",
-            "--no-sandbox",
-            "--disable-setuid-sandbox",
-            "--disable-dev-shm-usage",
-            "--disable-gpu",
-            "--no-zygote",
-            "--single-process",
-            "--disable-extensions",
-        ):
-            opts.add_argument(arg)
-        driver = webdriver.Chrome(service=Service("/usr/bin/chromedriver"), options=opts)
-    else:
-        options = uc.ChromeOptions()
-        options.add_argument(f"--user-agent={_USER_AGENT}")
-        options.add_argument("--window-size=1920,1080")
-        options.add_argument("--headless=new")
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        driver = uc.Chrome(options=options, use_subprocess=True, version_main=147)
-
-    driver.get("https://www.fotbal.cz")
-    WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
-    driver.add_cookie({"name": "cf_clearance", "value": cf_clearance,
-                       "domain": ".fotbal.cz", "path": "/", "secure": True})
-    return driver
-
-
 def fetch_all() -> dict[str, tuple[list[dict], dict | None, str]]:
     cf = _get_cf_clearance()
-    driver = _make_driver(cf)
     results = {}
-    try:
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(
+            headless=True,
+            args=[
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+            ],
+        )
+        context = browser.new_context(user_agent=_USER_AGENT)
+        context.add_cookies([{
+            "name": "cf_clearance",
+            "value": cf,
+            "domain": ".fotbal.cz",
+            "path": "/",
+            "secure": True,
+            "httpOnly": False,
+            "sameSite": "None",
+        }])
+        page = context.new_page()
+
         for league_id, url in LEAGUES.items():
-            driver.get(url)
-            WebDriverWait(driver, 30).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "a.MatchRound-match"))
-            )
-            time.sleep(2)
-            soup = BeautifulSoup(driver.page_source, "html.parser")
+            page.goto(url, wait_until="domcontentloaded")
+            page.wait_for_selector("a.MatchRound-match", timeout=30000)
+            html = page.content()
+            soup = BeautifulSoup(html, "html.parser")
             title = soup.title.get_text(strip=True).split("|")[0].strip() if soup.title else league_id
             results[league_id] = (_parse_played(soup), _parse_next_round(soup), title)
-    finally:
-        driver.quit()
+
+        browser.close()
+
     return results
 
 
