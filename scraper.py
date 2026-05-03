@@ -40,20 +40,32 @@ def _get_cf_clearance() -> str:
     return cf
 
 
-def _make_driver(cf_clearance: str) -> uc.Chrome:
-    options = uc.ChromeOptions()
-    options.add_argument(f"--user-agent={_USER_AGENT}")
-    options.add_argument("--window-size=1920,1080")
-    options.add_argument("--headless=new")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
+def _make_driver(cf_clearance: str):
     if _ON_RAILWAY:
-        options.binary_location = "/usr/bin/chromium"
-        driver = uc.Chrome(options=options, driver_executable_path="/usr/bin/chromedriver", use_subprocess=False)
+        from selenium import webdriver
+        from selenium.webdriver.chrome.service import Service
+        opts = webdriver.ChromeOptions()
+        opts.binary_location = "/usr/bin/chromium"
+        for arg in (
+            f"--user-agent={_USER_AGENT}",
+            "--window-size=1920,1080",
+            "--headless=new",
+            "--no-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-gpu",
+            "--no-zygote",
+        ):
+            opts.add_argument(arg)
+        driver = webdriver.Chrome(service=Service("/usr/bin/chromedriver"), options=opts)
     else:
+        options = uc.ChromeOptions()
+        options.add_argument(f"--user-agent={_USER_AGENT}")
+        options.add_argument("--window-size=1920,1080")
+        options.add_argument("--headless=new")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
         driver = uc.Chrome(options=options, use_subprocess=True, version_main=147)
 
-    # inject cf_clearance before navigating to target pages
     driver.get("https://www.fotbal.cz")
     WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
     driver.add_cookie({"name": "cf_clearance", "value": cf_clearance,
