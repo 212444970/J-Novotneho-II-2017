@@ -1,6 +1,11 @@
 import os
 import re
+import time
 import requests
+import undetected_chromedriver as uc
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 
 LEAGUES = {
@@ -8,30 +13,70 @@ LEAGUES = {
     "liga2": "https://www.fotbal.cz/souteze/turnaje/zapas/b6493972-274a-44a9-ab8e-384fe33580ab",
 }
 
-# Set FLARESOLVERR_URL as Railway env var, e.g. http://flaresolverr:8191
 FLARESOLVERR_URL = os.environ.get("FLARESOLVERR_URL", "http://localhost:8191")
+_ON_RAILWAY = bool(os.environ.get("RAILWAY_ENVIRONMENT"))
+
+_USER_AGENT = (
+    "Mozilla/5.0 (X11; Linux x86_64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+)
 
 
-def _fetch_html(url: str) -> str:
+def _get_cf_clearance() -> str:
+    """Use FlareSolverr to get a valid cf_clearance cookie."""
     resp = requests.post(
         f"{FLARESOLVERR_URL}/v1",
-        json={"cmd": "request.get", "url": url, "maxTimeout": 60000},
+        json={"cmd": "request.get", "url": "https://www.fotbal.cz", "maxTimeout": 60000},
         timeout=90,
     )
     resp.raise_for_status()
     data = resp.json()
     if data.get("status") != "ok":
-        raise RuntimeError(f"FlareSolverr error: {data.get('message')}")
-    return data["solution"]["response"]
+        raise RuntimeError(f"FlareSolverr: {data.get('message')}")
+    cookies = {c["name"]: c["value"] for c in data["solution"].get("cookies", [])}
+    cf = cookies.get("cf_clearance", "")
+    if not cf:
+        raise RuntimeError("cf_clearance cookie not found in FlareSolverr response")
+    return cf
+
+
+def _make_driver(cf_clearance: str) -> uc.Chrome:
+    options = uc.ChromeOptions()
+    options.add_argument(f"--user-agent={_USER_AGENT}")
+    options.add_argument("--window-size=1920,1080")
+    options.add_argument("--headless=new")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    if _ON_RAILWAY:
+        options.binary_location = "/usr/bin/google-chrome"
+        driver = uc.Chrome(options=options, use_subprocess=False)
+    else:
+        driver = uc.Chrome(options=options, use_subprocess=True, version_main=147)
+
+    # inject cf_clearance before navigating to target pages
+    driver.get("https://www.fotbal.cz")
+    WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+    driver.add_cookie({"name": "cf_clearance", "value": cf_clearance,
+                       "domain": ".fotbal.cz", "path": "/", "secure": True})
+    return driver
 
 
 def fetch_all() -> dict[str, tuple[list[dict], dict | None, str]]:
+    cf = _get_cf_clearance()
+    driver = _make_driver(cf)
     results = {}
-    for league_id, url in LEAGUES.items():
-        html = _fetch_html(url)
-        soup = BeautifulSoup(html, "html.parser")
-        title = soup.title.get_text(strip=True).split("|")[0].strip() if soup.title else league_id
-        results[league_id] = (_parse_played(soup), _parse_next_round(soup), title)
+    try:
+        for league_id, url in LEAGUES.items():
+            driver.get(url)
+            WebDriverWait(driver, 30).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "a.MatchRound-match"))
+            )
+            time.sleep(2)
+            soup = BeautifulSoup(driver.page_source, "html.parser")
+            title = soup.title.get_text(strip=True).split("|")[0].strip() if soup.title else league_id
+            results[league_id] = (_parse_played(soup), _parse_next_round(soup), title)
+    finally:
+        driver.quit()
     return results
 
 
