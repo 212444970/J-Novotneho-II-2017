@@ -51,9 +51,12 @@ def _make_driver(cf_clearance: str):
             "--window-size=1920,1080",
             "--headless=new",
             "--no-sandbox",
+            "--disable-setuid-sandbox",
             "--disable-dev-shm-usage",
             "--disable-gpu",
             "--no-zygote",
+            "--single-process",
+            "--disable-extensions",
         ):
             opts.add_argument(arg)
         driver = webdriver.Chrome(service=Service("/usr/bin/chromedriver"), options=opts)
