@@ -37,14 +37,24 @@ def index():
 
 @app.route("/debug")
 def debug():
-    from scraper import _fetch_html, LEAGUES
-    url = list(LEAGUES.values())[0]
-    html = _fetch_html(url)
-    from bs4 import BeautifulSoup
-    soup = BeautifulSoup(html, "html.parser")
-    title = soup.title.get_text() if soup.title else "no title"
-    matches = len(soup.select("a.MatchRound-match"))
-    return f"<pre>Title: {title}\nMatchRound-match count: {matches}\n\nFirst 3000 chars:\n{html[:3000]}</pre>"
+    import traceback
+    try:
+        from scraper import fetch_all, LEAGUES
+        url = list(LEAGUES.values())[0]
+        from scraper import _get_cf_clearance, _make_driver
+        from bs4 import BeautifulSoup
+        cf = _get_cf_clearance()
+        driver = _make_driver(cf)
+        driver.get(url)
+        import time; time.sleep(5)
+        html = driver.page_source
+        driver.quit()
+        soup = BeautifulSoup(html, "html.parser")
+        title = soup.title.get_text() if soup.title else "no title"
+        matches = len(soup.select("a.MatchRound-match"))
+        return f"<pre>Title: {title}\nMatchRound-match count: {matches}\n\nFirst 3000 chars:\n{html[:3000]}</pre>"
+    except Exception:
+        return f"<pre>{traceback.format_exc()}</pre>", 500
 
 
 @app.route("/refresh", methods=["POST"])
