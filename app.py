@@ -35,6 +35,18 @@ def index():
     return render_template("index.html", leagues=leagues, updated=updated, messages=messages)
 
 
+@app.route("/debug")
+def debug():
+    from scraper import _fetch_html, LEAGUES
+    url = list(LEAGUES.values())[0]
+    html = _fetch_html(url)
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(html, "html.parser")
+    title = soup.title.get_text() if soup.title else "no title"
+    matches = len(soup.select("a.MatchRound-match"))
+    return f"<pre>Title: {title}\nMatchRound-match count: {matches}\n\nFirst 3000 chars:\n{html[:3000]}</pre>"
+
+
 @app.route("/refresh", methods=["POST"])
 def refresh():
     try:
