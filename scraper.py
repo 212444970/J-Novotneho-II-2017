@@ -48,8 +48,8 @@ def _make_driver(cf_clearance: str) -> uc.Chrome:
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     if _ON_RAILWAY:
-        options.binary_location = "/usr/bin/google-chrome"
-        driver = uc.Chrome(options=options, use_subprocess=False)
+        options.binary_location = "/usr/bin/chromium"
+        driver = uc.Chrome(options=options, driver_executable_path="/usr/bin/chromedriver", use_subprocess=False)
     else:
         driver = uc.Chrome(options=options, use_subprocess=True, version_main=147)
 
