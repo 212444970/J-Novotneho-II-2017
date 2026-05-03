@@ -229,8 +229,8 @@
     <button class="refresh-btn" id="refresh-btn" type="submit">Aktualizovat výsledky</button>
   </form>
   {% for msg in messages %}
-    {% if msg == 'ok' %}
-      <span class="msg-ok">Aktualizováno</span>
+    {% if msg.startswith('ok:') %}
+      <span class="msg-ok">Aktualizováno — {{ msg[3:] }}</span>
     {% elif msg.startswith('err:') %}
       <span class="msg-err">Chyba: {{ msg[4:] }}</span>
     {% endif %}

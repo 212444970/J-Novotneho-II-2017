@@ -39,8 +39,8 @@ def index():
 def refresh():
     try:
         from main import scrape_and_store
-        scrape_and_store()
-        flash("ok")
+        info = scrape_and_store()
+        flash(f"ok:{info}")
     except Exception as e:
         flash(f"err:{e}")
     return redirect(url_for("index"))

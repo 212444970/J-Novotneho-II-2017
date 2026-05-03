@@ -14,9 +14,10 @@ def _parse_score(score: str) -> tuple[int, int] | None:
         return None
 
 
-def scrape_and_store() -> None:
+def scrape_and_store() -> str:
     print("Načítám výsledky z fotbal.cz ...")
     all_data = fetch_all()
+    summary = []
     for league_id, (played, next_round, title) in all_data.items():
         saved = skipped = 0
         for m in played:
@@ -26,11 +27,11 @@ def scrape_and_store() -> None:
                 continue
             upsert_match(league_id, m["date"], m["home"], m["away"], *parsed)
             saved += 1
-        print(f"[{league_id}] {title}: {saved} zápasů uloženo, {skipped} přeskočeno.")
+        summary.append(f"{league_id}: {saved} zápasů ({len(played)} nalezeno)")
         if next_round:
             save_next_round(league_id, next_round["round"], next_round["matches"])
-            print(f"[{league_id}] Příští kolo: {next_round['round']} ({len(next_round['matches'])} zápasů)")
     set_last_updated()
+    return ", ".join(summary)
 
 
 def main() -> None:
