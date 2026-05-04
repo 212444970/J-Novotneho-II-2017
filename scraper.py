@@ -65,21 +65,17 @@ def fetch_all() -> dict[str, tuple[list[dict], dict | None, str]]:
         page = context.new_page()
 
         for league_id, url in LEAGUES.items():
-            page.goto(url, wait_until="networkidle", timeout=60000)
-            try:
-                page.wait_for_selector("a.MatchRound-match", timeout=15000)
-            except Exception:
-                html = page.content()
-                soup = BeautifulSoup(html, "html.parser")
-                title = soup.title.get_text(strip=True) if soup.title else "no title"
-                raise RuntimeError(
-                    f"Selector not found on {league_id}. "
-                    f"Page title: '{title}'. "
-                    f"First 500 chars: {html[:500]}"
-                )
+            page.goto(url, wait_until="load", timeout=60000)
+            page.wait_for_timeout(5000)
             html = page.content()
             soup = BeautifulSoup(html, "html.parser")
-            title = soup.title.get_text(strip=True).split("|")[0].strip() if soup.title else league_id
+            title = soup.title.get_text(strip=True) if soup.title else "no title"
+            matches_found = len(soup.select("a.MatchRound-match"))
+            if matches_found == 0:
+                raise RuntimeError(
+                    f"No matches on {league_id}. Title: '{title}'. First 500: {html[:500]}"
+                )
+            title = title.split("|")[0].strip()
             results[league_id] = (_parse_played(soup), _parse_next_round(soup), title)
 
         browser.close()
