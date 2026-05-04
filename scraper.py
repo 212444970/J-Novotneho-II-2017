@@ -2,6 +2,7 @@ import os
 import re
 import requests
 from playwright.sync_api import sync_playwright
+from playwright_stealth import stealth_sync
 from bs4 import BeautifulSoup
 
 LEAGUES = {
@@ -17,7 +18,7 @@ _USER_AGENT = (
 )
 
 
-def _get_cf_clearance() -> str:
+def _get_flaresolverr_cookies() -> list[dict]:
     resp = requests.post(
         f"{FLARESOLVERR_URL}/v1",
         json={"cmd": "request.get", "url": "https://www.fotbal.cz", "maxTimeout": 60000},
@@ -28,15 +29,11 @@ def _get_cf_clearance() -> str:
     data = resp.json()
     if data.get("status") != "ok":
         raise RuntimeError(f"FlareSolverr: {data.get('message')}")
-    cookies = {c["name"]: c["value"] for c in data["solution"].get("cookies", [])}
-    cf = cookies.get("cf_clearance", "")
-    if not cf:
-        raise RuntimeError("cf_clearance cookie not found in FlareSolverr response")
-    return cf
+    return data["solution"].get("cookies", [])
 
 
 def fetch_all() -> dict[str, tuple[list[dict], dict | None, str]]:
-    cf = _get_cf_clearance()
+    raw_cookies = _get_flaresolverr_cookies()
     results = {}
 
     with sync_playwright() as p:
@@ -47,33 +44,40 @@ def fetch_all() -> dict[str, tuple[list[dict], dict | None, str]]:
                 "--disable-setuid-sandbox",
                 "--disable-dev-shm-usage",
                 "--disable-gpu",
-                "--no-zygote",
-                "--single-process",
-                "--disable-extensions",
             ],
         )
         context = browser.new_context(user_agent=_USER_AGENT)
-        context.add_cookies([{
-            "name": "cf_clearance",
-            "value": cf,
-            "domain": ".fotbal.cz",
-            "path": "/",
-            "secure": True,
-            "httpOnly": False,
-            "sameSite": "None",
-        }])
+
+        playwright_cookies = []
+        for c in raw_cookies:
+            same_site = c.get("sameSite", "Lax")
+            if same_site not in ("Strict", "Lax", "None"):
+                same_site = "Lax"
+            playwright_cookies.append({
+                "name": c["name"],
+                "value": c["value"],
+                "domain": c.get("domain", ".fotbal.cz"),
+                "path": c.get("path", "/"),
+                "secure": bool(c.get("secure", False)),
+                "httpOnly": bool(c.get("httpOnly", False)),
+                "sameSite": same_site,
+            })
+        if playwright_cookies:
+            context.add_cookies(playwright_cookies)
+
         page = context.new_page()
+        stealth_sync(page)
 
         for league_id, url in LEAGUES.items():
             page.goto(url, wait_until="load", timeout=60000)
-            page.wait_for_timeout(5000)
+            page.wait_for_timeout(8000)
             html = page.content()
             soup = BeautifulSoup(html, "html.parser")
             title = soup.title.get_text(strip=True) if soup.title else "no title"
             matches_found = len(soup.select("a.MatchRound-match"))
             if matches_found == 0:
                 raise RuntimeError(
-                    f"No matches on {league_id}. Title: '{title}'. First 500: {html[:500]}"
+                    f"No matches on {league_id}. Title: '{title}'. First 300: {html[:300]}"
                 )
             title = title.split("|")[0].strip()
             results[league_id] = (_parse_played(soup), _parse_next_round(soup), title)
