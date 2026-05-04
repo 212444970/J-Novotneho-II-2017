@@ -46,6 +46,9 @@ def fetch_all() -> dict[str, tuple[list[dict], dict | None, str]]:
                 "--disable-setuid-sandbox",
                 "--disable-dev-shm-usage",
                 "--disable-gpu",
+                "--no-zygote",
+                "--single-process",
+                "--disable-extensions",
             ],
         )
         context = browser.new_context(user_agent=_USER_AGENT)
