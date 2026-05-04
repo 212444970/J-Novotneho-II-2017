@@ -23,7 +23,8 @@ def _get_cf_clearance() -> str:
         json={"cmd": "request.get", "url": "https://www.fotbal.cz", "maxTimeout": 60000},
         timeout=90,
     )
-    resp.raise_for_status()
+    if not resp.ok:
+        raise RuntimeError(f"FlareSolverr HTTP {resp.status_code}: {resp.text[:400]}")
     data = resp.json()
     if data.get("status") != "ok":
         raise RuntimeError(f"FlareSolverr: {data.get('message')}")
