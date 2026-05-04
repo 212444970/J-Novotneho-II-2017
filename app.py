@@ -39,19 +39,11 @@ def index():
 def debug():
     import traceback
     try:
-        from scraper import _get_cf_clearance, LEAGUES
-        from playwright.sync_api import sync_playwright
+        from scraper import _fs, LEAGUES
         from bs4 import BeautifulSoup
-        cf = _get_cf_clearance()
         url = list(LEAGUES.values())[0]
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu", "--no-zygote", "--single-process", "--disable-extensions"])
-            page = browser.new_page()
-            page.add_cookies = lambda *a, **k: None
-            page.goto(url, wait_until="domcontentloaded")
-            page.wait_for_timeout(5000)
-            html = page.content()
-            browser.close()
+        data = _fs("request.get", url=url, maxTimeout=60000)
+        html = data["solution"]["response"]
         soup = BeautifulSoup(html, "html.parser")
         title = soup.title.get_text() if soup.title else "no title"
         matches = len(soup.select("a.MatchRound-match"))

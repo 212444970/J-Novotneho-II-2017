@@ -1,8 +1,6 @@
 import os
 import re
 import requests
-from playwright.sync_api import sync_playwright
-from playwright_stealth import stealth_sync
 from bs4 import BeautifulSoup
 
 LEAGUES = {
@@ -12,77 +10,39 @@ LEAGUES = {
 
 FLARESOLVERR_URL = os.environ.get("FLARESOLVERR_URL", "http://localhost:8191")
 
-_USER_AGENT = (
-    "Mozilla/5.0 (X11; Linux x86_64) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-)
 
-
-def _get_flaresolverr_cookies() -> list[dict]:
-    resp = requests.post(
-        f"{FLARESOLVERR_URL}/v1",
-        json={"cmd": "request.get", "url": "https://www.fotbal.cz", "maxTimeout": 60000},
-        timeout=90,
-    )
+def _fs(cmd: str, **kwargs) -> dict:
+    resp = requests.post(f"{FLARESOLVERR_URL}/v1", json={"cmd": cmd, **kwargs}, timeout=120)
     if not resp.ok:
         raise RuntimeError(f"FlareSolverr HTTP {resp.status_code}: {resp.text[:400]}")
     data = resp.json()
     if data.get("status") != "ok":
-        raise RuntimeError(f"FlareSolverr: {data.get('message')}")
-    return data["solution"].get("cookies", [])
+        raise RuntimeError(f"FlareSolverr error: {data.get('message')}")
+    return data
 
 
 def fetch_all() -> dict[str, tuple[list[dict], dict | None, str]]:
-    raw_cookies = _get_flaresolverr_cookies()
-    results = {}
-
-    with sync_playwright() as p:
-        browser = p.chromium.launch(
-            headless=True,
-            args=[
-                "--no-sandbox",
-                "--disable-setuid-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-gpu",
-            ],
-        )
-        context = browser.new_context(user_agent=_USER_AGENT)
-
-        playwright_cookies = []
-        for c in raw_cookies:
-            same_site = c.get("sameSite", "Lax")
-            if same_site not in ("Strict", "Lax", "None"):
-                same_site = "Lax"
-            playwright_cookies.append({
-                "name": c["name"],
-                "value": c["value"],
-                "domain": c.get("domain", ".fotbal.cz"),
-                "path": c.get("path", "/"),
-                "secure": bool(c.get("secure", False)),
-                "httpOnly": bool(c.get("httpOnly", False)),
-                "sameSite": same_site,
-            })
-        if playwright_cookies:
-            context.add_cookies(playwright_cookies)
-
-        page = context.new_page()
-        stealth_sync(page)
-
+    session_id = _fs("sessions.create")["session"]
+    try:
+        _fs("request.get", url="https://www.fotbal.cz", session=session_id, maxTimeout=60000)
+        results = {}
         for league_id, url in LEAGUES.items():
-            page.goto(url, wait_until="load", timeout=60000)
-            page.wait_for_timeout(8000)
-            html = page.content()
+            data = _fs("request.get", url=url, session=session_id, maxTimeout=60000)
+            html = data["solution"]["response"]
             soup = BeautifulSoup(html, "html.parser")
             title = soup.title.get_text(strip=True) if soup.title else "no title"
             matches_found = len(soup.select("a.MatchRound-match"))
             if matches_found == 0:
                 raise RuntimeError(
-                    f"No matches on {league_id}. Title: '{title}'. First 300: {html[:300]}"
+                    f"No matches on {league_id}. Title: '{title}'. First 400: {html[:400]}"
                 )
             title = title.split("|")[0].strip()
             results[league_id] = (_parse_played(soup), _parse_next_round(soup), title)
-
-        browser.close()
+    finally:
+        try:
+            _fs("sessions.destroy", session=session_id)
+        except Exception:
+            pass
 
     return results
 
