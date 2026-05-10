@@ -62,11 +62,20 @@ def api_push():
 def debug():
     import traceback
     try:
-        from scraper import _fs, LEAGUES
+        from scraper import _get_cf_clearance, LEAGUES
+        from playwright.sync_api import sync_playwright
         from bs4 import BeautifulSoup
+        cf, user_agent = _get_cf_clearance()
         url = list(LEAGUES.values())[0]
-        data = _fs("request.get", url=url, maxTimeout=60000)
-        html = data["solution"]["response"]
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu", "--no-zygote", "--disable-extensions"])
+            context = browser.new_context(user_agent=user_agent)
+            context.add_cookies([{"name": "cf_clearance", "value": cf, "domain": ".fotbal.cz", "path": "/", "secure": True, "httpOnly": False, "sameSite": "None"}])
+            page = context.new_page()
+            page.goto(url, wait_until="load", timeout=60000)
+            page.wait_for_timeout(5000)
+            html = page.content()
+            browser.close()
         soup = BeautifulSoup(html, "html.parser")
         title = soup.title.get_text() if soup.title else "no title"
         matches = len(soup.select("a.MatchRound-match"))

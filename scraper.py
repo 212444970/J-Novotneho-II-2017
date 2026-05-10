@@ -1,6 +1,7 @@
 import os
 import re
 import requests
+from playwright.sync_api import sync_playwright
 from bs4 import BeautifulSoup
 
 LEAGUES = {
@@ -9,6 +10,19 @@ LEAGUES = {
 }
 
 FLARESOLVERR_URL = os.environ.get("FLARESOLVERR_URL", "http://localhost:8191")
+
+_USER_AGENT = (
+    "Mozilla/5.0 (X11; Linux x86_64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+)
+
+_CONSENT_SELECTORS = [
+    "#didomi-notice-agree-button",
+    ".didomi-btn-agree",
+    "button:has-text('Souhlasím')",
+    "button:has-text('Přijmout vše')",
+    "button:has-text('Přijmout')",
+]
 
 
 def _fs(cmd: str, **kwargs) -> dict:
@@ -21,28 +35,72 @@ def _fs(cmd: str, **kwargs) -> dict:
     return data
 
 
+def _get_cf_clearance() -> tuple[str, str]:
+    data = _fs("request.get", url="https://www.fotbal.cz", maxTimeout=60000)
+    cookies = {c["name"]: c["value"] for c in data["solution"].get("cookies", [])}
+    user_agent = data["solution"].get("userAgent", _USER_AGENT)
+    cf = cookies.get("cf_clearance", "")
+    if not cf:
+        raise RuntimeError("cf_clearance cookie not found in FlareSolverr response")
+    return cf, user_agent
+
+
 def fetch_all() -> dict[str, tuple[list[dict], dict | None, str]]:
-    session_id = _fs("sessions.create")["session"]
-    try:
-        _fs("request.get", url="https://www.fotbal.cz", session=session_id, maxTimeout=60000)
-        results = {}
+    cf, user_agent = _get_cf_clearance()
+    results = {}
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(
+            headless=True,
+            args=[
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--no-zygote",
+                "--disable-extensions",
+            ],
+        )
+        context = browser.new_context(user_agent=user_agent)
+        context.add_cookies([{
+            "name": "cf_clearance",
+            "value": cf,
+            "domain": ".fotbal.cz",
+            "path": "/",
+            "secure": True,
+            "httpOnly": False,
+            "sameSite": "None",
+        }])
+        page = context.new_page()
+
         for league_id, url in LEAGUES.items():
-            data = _fs("request.get", url=url, session=session_id, maxTimeout=60000)
-            html = data["solution"]["response"]
-            soup = BeautifulSoup(html, "html.parser")
-            title = soup.title.get_text(strip=True) if soup.title else "no title"
-            matches_found = len(soup.select("a.MatchRound-match"))
-            if matches_found == 0:
+            page.goto(url, wait_until="load", timeout=60000)
+
+            # Dismiss GDPR consent dialog so the SPA renders match content
+            for sel in _CONSENT_SELECTORS:
+                try:
+                    page.click(sel, timeout=5000)
+                    page.wait_for_load_state("networkidle", timeout=15000)
+                    break
+                except Exception:
+                    pass
+
+            try:
+                page.wait_for_selector("a.MatchRound-match", timeout=30000)
+            except Exception:
+                html = page.content()
+                soup = BeautifulSoup(html, "html.parser")
+                title = soup.title.get_text(strip=True) if soup.title else "no title"
                 raise RuntimeError(
                     f"No matches on {league_id}. Title: '{title}'. First 400: {html[:400]}"
                 )
-            title = title.split("|")[0].strip()
+
+            html = page.content()
+            soup = BeautifulSoup(html, "html.parser")
+            title = soup.title.get_text(strip=True).split("|")[0].strip() if soup.title else league_id
             results[league_id] = (_parse_played(soup), _parse_next_round(soup), title)
-    finally:
-        try:
-            _fs("sessions.destroy", session=session_id)
-        except Exception:
-            pass
+
+        browser.close()
 
     return results
 
