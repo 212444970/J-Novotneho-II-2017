@@ -18,15 +18,37 @@ LEAGUES = {
 }
 
 
+def _dismiss_consent(driver):
+    selectors = [
+        "#didomi-notice-agree-button",
+        ".didomi-btn-agree",
+        "button[id*='agree']",
+    ]
+    for sel in selectors:
+        try:
+            btn = WebDriverWait(driver, 5).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, sel))
+            )
+            btn.click()
+            time.sleep(1)
+            return
+        except Exception:
+            pass
+
+
 def scrape() -> dict:
     options = uc.ChromeOptions()
     options.add_argument("--window-size=1920,1080")
-    driver = uc.Chrome(options=options, use_subprocess=True)
+    driver = uc.Chrome(options=options, use_subprocess=True, version_main=149)
     results = {}
     try:
+        first = True
         for league_id, url in LEAGUES.items():
             print(f"  Načítám {league_id}...")
             driver.get(url)
+            if first:
+                _dismiss_consent(driver)
+                first = False
             WebDriverWait(driver, 30).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, "a.MatchRound-match"))
             )
@@ -97,6 +119,7 @@ def _get_date(a):
 def push(data: dict):
     url = f"{RAILWAY_URL}/api/push"
     resp = requests.post(url, json=data, headers={"X-Secret": PUSH_SECRET}, timeout=30)
+    print(f"Status: {resp.status_code}, odpověď: {resp.text[:200]}")
     resp.raise_for_status()
     return resp.json()
 
